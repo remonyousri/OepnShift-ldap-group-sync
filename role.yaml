@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ldap-group-syncer-v2
+  namespace: openshift-authentication
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ldap-group-syncer-v2
+rules:
+- apiGroups: ["user.openshift.io"]
+  resources: ["groups"]
+  verbs: ["get", "list", "create", "update", "patch"]
+- apiGroups: ["user.openshift.io"]
+  resources: ["users", "identities"]
+  verbs: ["get", "list", "delete"]
+# remove grants left behind by users deleted from AD (delete only: no create/update/bind)
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["rolebindings", "clusterrolebindings"]
+  verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ldap-group-syncer-v2
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ldap-group-syncer-v2
+subjects:
+- kind: ServiceAccount
+  name: ldap-group-syncer-v2
+  namespace: openshift-authentication
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ldap-group-syncer-v2-console
+  namespace: openshift-console-user-settings
+rules:
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles"]
+  verbs: ["get", "delete"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ldap-group-syncer-v2-console
+  namespace: openshift-console-user-settings
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ldap-group-syncer-v2-console
+subjects:
+- kind: ServiceAccount
+  name: ldap-group-syncer-v2
+  namespace: openshift-authentication
+

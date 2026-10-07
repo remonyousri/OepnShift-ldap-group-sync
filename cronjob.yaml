@@ -1,0 +1,82 @@
+# ldap-group-syncer-v2: LDAP group sync + removal of OpenShift users deleted from AD.
+# Needs: role.yaml (ServiceAccount + RBAC), ConfigMap ldap-group-syncer-v2 (built by
+# kustomization.yaml) and Secret ldap-group-syncer-v2-bind (key bindPassword, see README.md).
+#
+# Ships suspended and in dry-run mode for a new cluster. Go-live (see README.md):
+#   oc set env cronjob/ldap-group-syncer-v2 -n openshift-authentication DRY_RUN=false
+#   oc patch cronjob ldap-group-syncer-v2 -n openshift-authentication -p '{"spec":{"suspend":false}}'
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ldap-group-syncer-v2
+  namespace: openshift-authentication
+spec:
+  schedule: "*/15 * * * *"
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 300
+      template:
+        spec:
+          serviceAccountName: ldap-group-syncer-v2
+          restartPolicy: Never
+          containers:
+          - name: ldap-group-sync
+            # the cluster's own cli image, pinned by digest. This digest is non-prod's (OCP 4.21);
+            # on another cluster replace it with the output of:
+            #   oc get is cli -n openshift -o jsonpath='{.status.tags[0].items[0].dockerImageReference}'
+            image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:36189368c887ec353d95711c33242df75b26ac5207502cf87fb115b40f32a0e6
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/bash
+            - -c
+            - |
+              rc=0
+              oc adm groups sync --whitelist=/etc/config/whitelist.txt --sync-config=/etc/config/ldap-group-sync.yaml --confirm || rc=1
+              python3 /etc/config/prune_ldap_users.py || rc=1
+              exit $rc
+            env:
+            - name: DRY_RUN
+              value: "true"
+            - name: MAX_DELETE
+              value: "5"
+            - name: EXCLUDE_USERS
+              value: ""
+            - name: IDP_NAME
+              value: NFII
+            - name: LDAP_HOST
+              value: nfii.com
+            - name: LDAP_PORT
+              value: "389"
+            - name: LDAP_BASE_DN
+              value: DC=nfii,DC=com
+            - name: LDAP_BIND_DN
+              value: CN=ldapokd,OU=Users,OU=Linux,DC=nfii,DC=com
+            - name: LDAP_BIND_PW_FILE
+              value: /etc/ldap-secret/bindPassword
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi
+            volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: bind
+              mountPath: /etc/ldap-secret
+              readOnly: true
+          volumes:
+          - name: config
+            configMap:
+              name: ldap-group-syncer-v2
+          - name: bind
+            secret:
+              secretName: ldap-group-syncer-v2-bind
+              defaultMode: 0440

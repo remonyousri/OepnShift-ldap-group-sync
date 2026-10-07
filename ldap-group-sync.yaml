@@ -1,0 +1,20 @@
+kind: LDAPSyncConfig
+apiVersion: v1
+url: ldap://nfii.com:389
+insecure: true
+bindDN: CN=ldapokd,OU=Users,OU=Linux,DC=nfii,DC=com
+bindPassword:
+  file: /etc/ldap-secret/bindPassword
+groupUIDNameMapping:
+  "CN=OCPadmins,OU=Openshift,OU=Admin and Service Accounts,OU=Accounts,DC=nfii,DC=com": OCPadmins
+  "CN=OCPusers,OU=Openshift,OU=Admin and Service Accounts,OU=Accounts,DC=nfii,DC=com": OCPusers
+  "CN=OCPSupport,OU=Openshift,OU=Admin and Service Accounts,OU=Accounts,DC=nfii,DC=com": OCPSupport
+activeDirectory:
+    usersQuery:
+        baseDN: "OU=Divisions,OU=Accounts,DC=nfii,DC=com"
+        scope: sub
+        derefAliases: never
+        pageSize: 0
+        filter: (objectClass=person)
+    userNameAttributes: [ sAMAccountName ]
+    groupMembershipAttributes: [ memberOf ]

@@ -1,0 +1,16 @@
+# oc apply -k .   -> ServiceAccount + RBAC, ConfigMap (from the 3 files below) and the CronJob.
+# The bind password Secret is not in here on purpose; create it as described in README.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- role.yaml
+- cronjob.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+- name: ldap-group-syncer-v2
+  namespace: openshift-authentication
+  files:
+  - ldap-group-sync.yaml
+  - whitelist.txt
+  - prune_ldap_users.py
